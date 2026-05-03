@@ -1,0 +1,15 @@
+{
+  "linear": {
+    "teamKey": "ENG",
+    "issueFilter": {
+      "state": { "type": { "eq": "started" } },
+      "labels": { "name": { "in": ["paperclip-sync"] } }
+    }
+  },
+  "paperclip": {
+    "defaultProjectId": "REPLACE-WITH-PROJECT-UUID",
+    "defaultAgentId": "REPLACE-WITH-AGENT-UUID"
+  },
+  "cronSchedule": "*/5 * * * *",
+  "syncEnabled": true
+}
