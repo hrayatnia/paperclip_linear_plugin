@@ -108,6 +108,21 @@ examples/
 - `npm test` — vitest, single run
 - `npm run test:watch` — vitest in watch mode
 
+## Local smoke test
+
+`scripts/local-run.ts` wires the plugin's real cron handler and push handlers to a fake-host context backed by `@paperclipai/plugin-sdk/testing`. Linear API calls hit the real Linear API; Paperclip-side writes (`ctx.issues.create` / `ctx.issues.update`) are stubbed and logged so no running Paperclip instance is required.
+
+1. Copy `.env.example` to `.env` and fill in `LINEAR_API_KEY` with a personal Linear API key from <https://linear.app/settings/api>.
+2. (Optional) Override `LINEAR_TEAM_KEY`, `PAPERCLIP_COMPANY_ID`, `PAPERCLIP_PROJECT_ID`, `PAPERCLIP_AGENT_ID`, or `LINEAR_ISSUE_FILTER` (JSON string) in `.env`.
+3. Run one of:
+   - `npm run local:sync` — invokes `runLinearSync(ctx)` once against real Linear and logs every Paperclip write that *would* happen.
+   - `npm run local:sync -- --mode push` — registers the push handlers and fires synthetic `issue.updated` and `issue.comment.created` events; the plugin pushes them to real Linear.
+   - `npm run local:sync -- --mode both` — pull, then push.
+   - `npm run local:sync -- --limit 5` — caps Linear fetch to the first N issues.
+   - `npm run local:sync -- --help` — full usage.
+
+The runner uses `node --env-file=.env --import tsx` so no separate build step is required.
+
 ## Testing
 
 Tests live under `src/__tests__/` and run with [Vitest](https://vitest.dev). Plugin behaviour is exercised against `@paperclipai/plugin-sdk/testing`'s [`createTestHarness`](https://github.com/paperclipai/paperclip/tree/master/packages/plugins/sdk), which provides an in-memory implementation of `ctx.jobs`, `ctx.events`, `ctx.state`, `ctx.secrets`, and `ctx.logger`. The current `smoke.test.ts` pins the manifest invariants (id, cron schedule, capabilities, required config) so changes that would break operator deployment fail loudly in CI.
