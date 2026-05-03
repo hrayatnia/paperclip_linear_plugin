@@ -2,10 +2,20 @@
 
 A [Paperclip](https://github.com/paperclipai/paperclip) plugin that syncs [Linear](https://linear.app) tickets in and out on a cron schedule.
 
-- **Linear → Paperclip:** every ~5 minutes, fetch updated Linear issues and mirror them as Paperclip issues assigned to a configured handler agent.
-- **Paperclip → Linear:** when the agent updates the mirrored issue or adds a comment, push the change back to Linear.
+## What it does
 
-## Quick install
+- Pulls updated Linear issues every five minutes and mirrors them as Paperclip issues assigned to a configured handler agent.
+- Pushes Paperclip changes (status, comments, edits) back to the matching Linear issue when the agent updates the mirror.
+- Runs as a Paperclip cron job — no separate process or daemon is required, only the host Paperclip instance.
+- Operates bidirectionally and incrementally, using a stored cursor so each tick only processes issues changed since the previous run.
+
+## Architecture
+
+This is a Paperclip plugin, not a standalone cron daemon. It declares a `jobs[]` entry in its manifest so the host Paperclip instance schedules and runs the `linear-sync` job, and it uses `ctx.events` subscriptions to react to Paperclip issue/comment changes for the push direction. The plugin keeps its mapping state in `ctx.state` and reads its Linear API key from `ctx.secrets`. All scheduling, retries, and lifecycle are handled by the Paperclip host.
+
+## Operator install
+
+For local development:
 
 ```bash
 npm install
@@ -13,26 +23,63 @@ npm run build
 npm test
 ```
 
-For operator install into a Paperclip instance, see the [Paperclip plugin docs](https://github.com/paperclipai/paperclip/blob/master/doc/plugins/PLUGIN_SPEC.md).
+For a Paperclip instance, install the plugin with the Paperclip CLI and configure it from the admin UI:
+
+```bash
+pnpm paperclipai plugin install paperclip-plugin-linear
+```
+
+After install, open the Paperclip admin UI, set the configuration values listed below, and add the Linear API key as a plugin secret.
 
 ## Configuration
 
-Plugin settings (set via Paperclip's plugin settings UI):
+Set these values via the Paperclip admin UI under the plugin's configuration tab. They map directly to the `instanceConfigSchema` declared in `src/manifest.ts`.
 
-| Key | Type | Description |
-|---|---|---|
-| `linear.teamKey` | string | Linear team key (e.g. `ENG`). |
-| `linear.issueFilter` | object | Optional Linear API filter (e.g. `{ state: { name: { eq: "Todo" } } }`). |
-| `paperclip.defaultProjectId` | string (uuid) | Paperclip project to create mirrored issues in. |
-| `paperclip.defaultAgentId` | string (uuid) | Agent to assign each mirrored issue to. |
-| `cronSchedule` | string | 5-field cron expression. Default `*/5 * * * *`. |
-| `syncEnabled` | boolean | Master kill-switch. Default `true`. |
+| Key | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `linear.teamKey` | string | yes | — | Linear team key, e.g. `ENG`. |
+| `linear.issueFilter` | object | no | — | Optional Linear API filter passed verbatim to `client.issues({ filter })`. |
+| `paperclip.defaultProjectId` | string (uuid) | yes | — | Paperclip project to create mirrored issues in. |
+| `paperclip.defaultAgentId` | string (uuid) | yes | — | Agent that handles each mirrored issue. |
+| `cronSchedule` | string | no | `*/5 * * * *` | Override for the cron schedule. 5-field cron syntax. |
+| `syncEnabled` | boolean | no | `true` | Master kill-switch for the cron job. |
 
-Plugin secrets:
+A worked example lives at [`examples/instance-config.example.json`](./examples/instance-config.example.json).
+
+## Secrets
 
 | Key | Description |
 |---|---|
-| `linear.apiKey` | Linear personal API key. Generate at https://linear.app/settings/api. |
+| `linear.apiKey` | Linear personal API key. Generate one at <https://linear.app/settings/api>. |
+
+Add the secret via the Paperclip admin UI's secrets panel — never check API keys into the configuration JSON or into git.
+
+## Default cron schedule
+
+The plugin ships with `*/5 * * * *` (every five minutes). Set the `cronSchedule` config value to override it; the override uses the same 5-field cron syntax.
+
+## Mapping
+
+Linear workflow state maps to Paperclip status:
+
+| Linear state | Paperclip status |
+|---|---|
+| `Todo` | `todo` |
+| `In Progress` | `in_progress` |
+| `In Review` | `in_review` |
+| `Done` | `done` |
+| `Backlog` | `blocked` |
+| _anything else_ | `todo` |
+
+Linear priority maps to Paperclip priority:
+
+| Linear priority | Paperclip priority |
+|---|---|
+| `1` (Urgent) | `critical` |
+| `2` (High) | `high` |
+| `3` (Medium) | `medium` |
+| `4` (Low) | `low` |
+| `0` (No priority) | `medium` |
 
 ## Project layout
 
@@ -41,19 +88,36 @@ src/
   manifest.ts        # PaperclipPluginManifestV1: jobs, capabilities, config schema
   worker.ts          # definePlugin: cron handler + event subscriptions
   index.ts           # re-exports
-  linear/            # @linear/sdk wrapper (W1)
-  state/             # ctx.state mapping + cursor (W2)
+  linear/            # @linear/sdk wrapper: Linear client construction and typed accessors
+  state/             # ctx.state-backed mapping store and incremental sync cursor
   sync/
-    pull.ts          # cron handler (W3)
-    push.ts          # event handlers (W4)
-  __tests__/         # smoke tests
+    pull.ts          # cron handler: Linear -> Paperclip mirroring
+    push.ts          # event handlers: Paperclip -> Linear updates
+  __tests__/         # vitest suites; smoke tests pin manifest invariants
+examples/
+  instance-config.example.json  # sample config matching the manifest schema
+.github/workflows/
+  ci.yml             # typecheck + build + test on every push and PR
 ```
 
 ## Development
 
 - `npm run typecheck` — `tsc --noEmit`
 - `npm run build` — emits `dist/`
-- `npm test` — vitest
+- `npm test` — vitest, single run
+- `npm run test:watch` — vitest in watch mode
+
+## Testing
+
+Tests live under `src/__tests__/` and run with [Vitest](https://vitest.dev). Plugin behaviour is exercised against `@paperclipai/plugin-sdk/testing`'s [`createTestHarness`](https://github.com/paperclipai/paperclip/tree/master/packages/plugins/sdk), which provides an in-memory implementation of `ctx.jobs`, `ctx.events`, `ctx.state`, `ctx.secrets`, and `ctx.logger`. The current `smoke.test.ts` pins the manifest invariants (id, cron schedule, capabilities, required config) so changes that would break operator deployment fail loudly in CI.
+
+## Troubleshooting
+
+- **Sync runs but nothing happens.** Confirm `linear.apiKey` is set as a plugin secret and that `syncEnabled` is `true`.
+- **`Linear team not found` errors.** The `linear.teamKey` must match the team key in Linear exactly (e.g. `ENG`, not the team's display name).
+- **Mirrored issues created but no agent picks them up.** The `paperclip.defaultAgentId` must reference a registered Paperclip agent in the same instance; check the agents tab.
+- **Cron didn't fire.** Verify the host Paperclip instance is running its scheduler, and that no other instance config override has set `cronSchedule` to an invalid expression.
+- **Push direction not working.** The plugin needs the `events.subscribe`, `issues.update`, and `issue.comments.create` capabilities granted; check the plugin's installed capabilities in the admin UI.
 
 ## Links
 
@@ -61,6 +125,7 @@ src/
 - [Paperclip docs](https://docs.paperclip.ing)
 - [Paperclip plugin spec](https://github.com/paperclipai/paperclip/blob/master/doc/plugins/PLUGIN_SPEC.md)
 - [Paperclip plugin SDK](https://github.com/paperclipai/paperclip/tree/master/packages/plugins/sdk) — `@paperclipai/plugin-sdk`
+- [Linear API key page](https://linear.app/settings/api)
 
 ## License
 
