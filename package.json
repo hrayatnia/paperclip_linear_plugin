@@ -1,0 +1,60 @@
+{
+  "name": "paperclip-plugin-linear",
+  "version": "0.1.0",
+  "description": "Paperclip plugin that syncs Linear tickets in and out on a cron schedule.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Sam Rayatnia <sam.rayatnia@squer.io>",
+  "homepage": "https://github.com/hrayatnia/paperclip_linear_plugin",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hrayatnia/paperclip_linear_plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hrayatnia/paperclip_linear_plugin/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "paperclipPlugin": {
+    "manifest": "./dist/manifest.js",
+    "worker": "./dist/worker.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@linear/sdk": "^83.0.0",
+    "@paperclipai/plugin-sdk": "^2026.428.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.5"
+  },
+  "keywords": [
+    "paperclip",
+    "paperclip-plugin",
+    "linear",
+    "linear-sdk",
+    "ticket-sync",
+    "cron"
+  ]
+}
