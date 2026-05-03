@@ -59,6 +59,10 @@ const manifest: PaperclipPluginManifestV1 = {
       paperclip: {
         type: "object",
         properties: {
+          companyId: {
+            type: "string",
+            description: "Paperclip company that owns the mirrored issues.",
+          },
           defaultProjectId: {
             type: "string",
             description: "Paperclip project to create mirrored issues in.",
@@ -68,7 +72,7 @@ const manifest: PaperclipPluginManifestV1 = {
             description: "Agent that handles each mirrored issue.",
           },
         },
-        required: ["defaultProjectId", "defaultAgentId"],
+        required: ["companyId", "defaultProjectId", "defaultAgentId"],
         additionalProperties: false,
       },
       cronSchedule: {

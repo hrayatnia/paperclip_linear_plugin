@@ -28,11 +28,12 @@ describe("manifest", () => {
     expect(caps).toContain("issue.comments.create");
   });
 
-  it("requires linear.teamKey and paperclip.defaultProjectId/defaultAgentId in config", () => {
+  it("requires linear.teamKey and paperclip.{companyId,defaultProjectId,defaultAgentId} in config", () => {
     const schema = manifest.instanceConfigSchema as
       | { properties?: Record<string, { required?: string[] }> }
       | undefined;
     expect(schema?.properties?.["linear"]?.required).toContain("teamKey");
+    expect(schema?.properties?.["paperclip"]?.required).toContain("companyId");
     expect(schema?.properties?.["paperclip"]?.required).toContain("defaultProjectId");
     expect(schema?.properties?.["paperclip"]?.required).toContain("defaultAgentId");
   });

@@ -39,6 +39,7 @@ Set these values via the Paperclip admin UI under the plugin's configuration tab
 |---|---|---|---|---|
 | `linear.teamKey` | string | yes | — | Linear team key, e.g. `ENG`. |
 | `linear.issueFilter` | object | no | — | Optional Linear API filter passed verbatim to `client.issues({ filter })`. |
+| `paperclip.companyId` | string (uuid) | yes | — | Paperclip company that owns the mirrored issues. |
 | `paperclip.defaultProjectId` | string (uuid) | yes | — | Paperclip project to create mirrored issues in. |
 | `paperclip.defaultAgentId` | string (uuid) | yes | — | Agent that handles each mirrored issue. |
 | `cronSchedule` | string | no | `*/5 * * * *` | Override for the cron schedule. 5-field cron syntax. |
